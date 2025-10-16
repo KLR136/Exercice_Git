@@ -19,23 +19,18 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.use('/', indexRouter);
+app.use('/users', usersRouter);
+app.use('/api/wh40k', wh40kRouter);
+
 var battlescribeData = require('./data/loadData');
 
 async function initializeApp() {
   try {
     await battlescribeData.loadData();
     console.log('✅ Données Warhammer 40k chargées avec succès');
-    
-    app.use('/', indexRouter);
-    app.use('/users', usersRouter);
-    app.use('/api/wh40k', wh40kRouter);
-    
   } catch (error) {
     console.error('❌ Erreur lors du chargement des données Warhammer:', error);
-    
-    app.use('/', indexRouter);
-    app.use('/users', usersRouter);
-    app.use('/api/wh40k', wh40kRouter);
   }
 }
 

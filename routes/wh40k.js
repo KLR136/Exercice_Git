@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const battlescribeData = require('./../data/loadData');
 
+console.log('✅ Routeur WH40k chargé');
+
+
 // GET /api/wh40k/units - Toutes les unités
 router.get('/units', (req, res) => {
     try {
