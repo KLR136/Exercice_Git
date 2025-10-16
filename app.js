@@ -28,7 +28,6 @@ var battlescribeData = require('./data/loadData');
 async function initializeApp() {
   try {
     await battlescribeData.loadData();
-    console.log('✅ Données Warhammer 40k chargées avec succès');
   } catch (error) {
     console.error('❌ Erreur lors du chargement des données Warhammer:', error);
   }

@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const battlescribeData = require('./../data/loadData');
 
-console.log('✅ Routeur WH40k chargé');
 
 
 // GET /api/wh40k/units - Toutes les unités
@@ -42,21 +41,54 @@ router.get('/units/:name', (req, res) => {
     }
 });
 
-// GET /api/wh40k/weapons - Toutes les armes
-router.get('/weapons', (req, res) => {
-    try {
-        const weapons = battlescribeData.getWeapons();
-        res.json({
-            success: true,
-            data: weapons,
-            count: weapons.length
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
+// GET /api/wh40k/units-with-weapons - Unités avec leurs armes
+router.get('/units-with-weapons', function(req, res, next) {
+  try {
+    const unitsWithWeapons = battlescribeData.getUnitsWithWeapons();
+    
+    res.json({
+      success: true,
+      data: unitsWithWeapons,
+      count: unitsWithWeapons.length
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// GET /api/wh40k/units/:id/weapons - Armes d'une unité spécifique
+router.get('/units/:id/weapons', function(req, res, next) {
+  try {
+    const units = battlescribeData.getUnits();
+    const unit = units.find(u => u.$.id === req.params.id);
+    
+    if (!unit) {
+      return res.status(404).json({
+        success: false,
+        message: 'Unité non trouvée'
+      });
     }
+    
+    const weapons = battlescribeData.getWeaponsForUnit(unit);
+    
+    res.json({
+      success: true,
+      unit: {
+        id: unit.$.id,
+        name: unit.$.name
+      },
+      weapons: weapons,
+      count: weapons.length
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 module.exports = router;
