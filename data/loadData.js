@@ -15,11 +15,8 @@ class BattlescribeData {
             }
             
             const xmlData = fs.readFileSync(this.dataPath, 'utf8');
-
-            
             const parser = new xml2js.Parser();
             this.data = await parser.parseStringPromise(xmlData);
-
             
             return this.data;
         } catch (error) {
@@ -29,7 +26,6 @@ class BattlescribeData {
     }
 
     getUnits() {
-        
         if (!this.data) {
             console.log('❌ Aucune donnée chargée');
             return [];
@@ -42,11 +38,9 @@ class BattlescribeData {
         
         try {
             const catalogue = this.data.catalogue;
-            
             let units = [];
             
-            
-            // METHODE 2: Recherche dans les structures connues
+            // METHODE: Recherche dans les structures connues
             if (catalogue.sharedSelectionEntries && catalogue.sharedSelectionEntries[0]) {
                 const sharedEntries = catalogue.sharedSelectionEntries[0].selectionEntry || [];
                 sharedEntries.forEach(entry => {
@@ -56,26 +50,14 @@ class BattlescribeData {
                 });
             }
 
+            console.log(`✅ ${units.length} unités trouvées`);
             
             // Affichez les noms des unités trouvées
             if (units.length > 0) {
-                units.slice(0, 10).forEach(unit => {
-                    console.log(`   - ${unit.$.name} (${unit.$.type || 'no type'})`);
+                console.log('📋 Exemples d\'unités:');
+                units.slice(0, 5).forEach(unit => {
+                    console.log(`   - ${unit.$.name} (${unit.$.type})`);
                 });
-            } else {
-                console.log('❌ Aucune unité trouvée avec les méthodes standards');
-                console.log('🔍 Exploration de la structure...');
-                
-                // Exploration pour comprendre la structure
-                if (catalogue.selectionEntries) {
-                    console.log('📁 selectionEntries trouvé:', catalogue.selectionEntries.length);
-                }
-                if (catalogue.entryLinks) {
-                    console.log('📁 entryLinks trouvé:', catalogue.entryLinks.length);
-                }
-                if (catalogue.sharedRules) {
-                    console.log('📁 sharedRules trouvé:', catalogue.sharedRules.length);
-                }
             }
             
             return units;
@@ -84,72 +66,86 @@ class BattlescribeData {
             return [];
         }
     }
-getWeaponsForUnit(unit) {
-    if (!unit || !unit.$) return [];
-    
-    try {
-        let weapons = [];
-        const weaponEntries = new Set();
+
+    getWeaponsForUnit(unit) {
+        if (!unit || !unit.$) return [];
         
-        // 1. Parcourir les entryLinks directs
-        if (unit.entryLinks) {
-            unit.entryLinks.forEach(linkGroup => {
-                if (linkGroup.entryLink) {
-                    linkGroup.entryLink.forEach(link => {
-                        if (link.$ && link.$.targetId) {
-                            weaponEntries.add(link.$.targetId);
-                        }
-                    });
-                }
-            });
+        try {
+            let weapons = [];
+            const weaponEntries = new Set();
+            
+            // 1. Parcourir les selectionEntries DIRECTS (armes intégrées)
+            if (unit.selectionEntries) {
+                unit.selectionEntries.forEach(entryGroup => {
+                    if (entryGroup.selectionEntry) {
+                        entryGroup.selectionEntry.forEach(entry => {
+                            if (entry.$) {
+                                weaponEntries.add(entry.$.id);
+                            }
+                        });
+                    }
+                });
+            }
+            
+            // 2. Parcourir les entryLinks directs
+            if (unit.entryLinks) {
+                unit.entryLinks.forEach(linkGroup => {
+                    if (linkGroup.entryLink) {
+                        linkGroup.entryLink.forEach(link => {
+                            if (link.$ && link.$.targetId) {
+                                weaponEntries.add(link.$.targetId);
+                            }
+                        });
+                    }
+                });
+            }
+            
+            // 3. Parcourir les selectionEntryGroups
+            if (unit.selectionEntryGroups) {
+                unit.selectionEntryGroups.forEach(group => {
+                    // EntryLinks dans les groupes
+                    if (group.entryLinks) {
+                        group.entryLinks.forEach(linkGroup => {
+                            if (linkGroup.entryLink) {
+                                linkGroup.entryLink.forEach(link => {
+                                    if (link.$ && link.$.targetId) {
+                                        weaponEntries.add(link.$.targetId);
+                                    }
+                                });
+                            }
+                        });
+                    }
+                    
+                    // SelectionEntryGroups imbriqués
+                    if (group.selectionEntryGroup) {
+                        group.selectionEntryGroup.forEach(subGroup => {
+                            if (subGroup.entryLinks) {
+                                subGroup.entryLinks.forEach(linkGroup => {
+                                    if (linkGroup.entryLink) {
+                                        linkGroup.entryLink.forEach(link => {
+                                            if (link.$ && link.$.targetId) {
+                                                weaponEntries.add(link.$.targetId);
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+            
+            // 4. Récupérer les profils d'armes depuis les IDs collectés
+            weapons = this.getWeaponProfilesFromIds(Array.from(weaponEntries));
+            
+            console.log(`🔫 ${weapons.length} armes trouvées pour ${unit.$.name}`);
+            
+            return weapons;
+        } catch (error) {
+            console.error('Erreur getWeaponsForUnit:', error);
+            return [];
         }
-        
-        // 2. Parcourir les selectionEntryGroups
-        if (unit.selectionEntryGroups) {
-            unit.selectionEntryGroups.forEach(group => {
-                // EntryLinks dans les groupes
-                if (group.entryLinks) {
-                    group.entryLinks.forEach(linkGroup => {
-                        if (linkGroup.entryLink) {
-                            linkGroup.entryLink.forEach(link => {
-                                if (link.$ && link.$.targetId) {
-                                    weaponEntries.add(link.$.targetId);
-                                }
-                            });
-                        }
-                    });
-                }
-                
-                // SelectionEntryGroups imbriqués
-                if (group.selectionEntryGroup) {
-                    group.selectionEntryGroup.forEach(subGroup => {
-                        if (subGroup.entryLinks) {
-                            subGroup.entryLinks.forEach(linkGroup => {
-                                if (linkGroup.entryLink) {
-                                    linkGroup.entryLink.forEach(link => {
-                                        if (link.$ && link.$.targetId) {
-                                            weaponEntries.add(link.$.targetId);
-                                        }
-                                    });
-                                }
-                            });
-                        }
-                    });
-                }
-            });
-        }
-        
-        // 3. Récupérer les profils d'armes depuis les IDs collectés
-        weapons = this.getWeaponProfilesFromIds(Array.from(weaponEntries));
-        
-        console.log(`🔫 ${weapons.length} armes trouvées pour ${unit.$.name}`);
-        
-        return weapons;
-    } catch (error) {
-        console.error('Erreur getWeaponsForUnit:', error);
-        return [];
     }
-}
 
     getWeaponProfilesFromIds(weaponIds) {
         if (!this.data || !this.data.catalogue || !weaponIds.length) return [];
@@ -160,43 +156,19 @@ getWeaponsForUnit(unit) {
             
             // Parcourir sharedSelectionEntries pour trouver les armes par ID
             if (catalogue.sharedSelectionEntries && catalogue.sharedSelectionEntries[0]) {
-                const entries = catalogue.sharedSelectionEntries[0].selectionEntry || [];
+                const sharedEntries = catalogue.sharedSelectionEntries[0].selectionEntry || [];
                 
                 weaponIds.forEach(weaponId => {
-                    const weaponEntry = entries.find(entry => entry.$ && entry.$.id === weaponId);
+                    let weaponEntry = sharedEntries.find(entry => entry.$ && entry.$.id === weaponId);
                     
-                    if (weaponEntry && weaponEntry.profiles) {
-                        // Extraire les profils d'arme de cette entrée
-                        weaponEntry.profiles.forEach(profileGroup => {
-                            if (profileGroup.profile) {
-                                profileGroup.profile.forEach(profile => {
-                                    if (profile.$ && profile.$.typeName) {
-                                        // Vérifier si c'est une arme par le typeName
-                                        const typeName = profile.$.typeName.toLowerCase();
-                                        if (typeName.includes('weapon')) {
-                                            const characteristics = {};
-                                            if (profile.characteristics && profile.characteristics[0]) {
-                                                profile.characteristics[0].characteristic.forEach(char => {
-                                                    characteristics[char.$.name] = char._;
-                                                });
-                                            }
-                                            
-                                            weapons.push({
-                                                id: profile.$.id,
-                                                name: profile.$.name,
-                                                type: profile.$.typeName,
-                                                characteristics: characteristics,
-                                                parentWeapon: {
-                                                    id: weaponEntry.$.id,
-                                                    name: weaponEntry.$.name,
-                                                    type: weaponEntry.$.type
-                                                }
-                                            });
-                                        }
-                                    }
-                                });
-                            }
-                        });
+                    // Si pas trouvé dans shared, chercher dans les entries directes de l'unité
+                    if (!weaponEntry) {
+                        weaponEntry = this.findWeaponEntryById(weaponId);
+                    }
+                    
+                    if (weaponEntry) {
+                        const weaponProfiles = this.extractWeaponProfiles(weaponEntry);
+                        weapons = weapons.concat(weaponProfiles);
                     }
                 });
             }
@@ -208,21 +180,101 @@ getWeaponsForUnit(unit) {
         }
     }
 
-    // Méthode pour obtenir les unités avec leurs armes
-    getUnitsWithWeapons() {
-        const units = this.getUnits();
+    // Méthode pour trouver une entrée d'arme par ID (recherche récursive)
+    findWeaponEntryById(weaponId, searchIn = null) {
+        if (!searchIn) {
+            searchIn = this.data.catalogue;
+        }
         
-        return units.map(unit => {
-            return {
-                unit: {
-                    id: unit.$.id,
-                    name: unit.$.name,
-                    type: unit.$.type,
-                    points: this.getUnitPoints(unit)
-                },
-                weapons: this.getWeaponsForUnit(unit)
-            };
+        if (!searchIn || typeof searchIn !== 'object') return null;
+        
+        // Si c'est l'entrée qu'on cherche
+        if (searchIn.$ && searchIn.$.id === weaponId) {
+            return searchIn;
+        }
+        
+        // Recherche récursive
+        for (const key in searchIn) {
+            if (Array.isArray(searchIn[key])) {
+                for (const item of searchIn[key]) {
+                    const found = this.findWeaponEntryById(weaponId, item);
+                    if (found) return found;
+                }
+            } else if (typeof searchIn[key] === 'object') {
+                const found = this.findWeaponEntryById(weaponId, searchIn[key]);
+                if (found) return found;
+            }
+        }
+        
+        return null;
+    }
+
+    // Méthode pour extraire les profils d'arme d'une entrée
+    extractWeaponProfiles(weaponEntry) {
+        const weapons = [];
+        
+        if (!weaponEntry.profiles) return weapons;
+        
+        weaponEntry.profiles.forEach(profileGroup => {
+            if (profileGroup.profile) {
+                profileGroup.profile.forEach(profile => {
+                    if (profile.$ && profile.$.typeName) {
+                        const typeName = profile.$.typeName.toLowerCase();
+                        // Vérifier si c'est une arme par le typeName
+                        if (typeName.includes('ranged weapons') || typeName.includes('melee weapons')) {
+                            const characteristics = {};
+                            if (profile.characteristics && profile.characteristics[0]) {
+                                profile.characteristics[0].characteristic.forEach(char => {
+                                    characteristics[char.$.name] = char._;
+                                });
+                            }
+                            
+                            weapons.push({
+                                id: profile.$.id,
+                                name: profile.$.name,
+                                type: profile.$.typeName,
+                                characteristics: characteristics,
+                                parentWeapon: {
+                                    id: weaponEntry.$.id,
+                                    name: weaponEntry.$.name,
+                                    type: weaponEntry.$.type
+                                }
+                            });
+                        }
+                    }
+                });
+            }
         });
+        
+        return weapons;
+    }
+
+    // MÉTHODE MANQUANTE - Unités avec leurs armes
+    getUnitsWithWeapons() {
+        try {
+            const units = this.getUnits();
+            console.log(`🔍 Recherche des armes pour ${units.length} unités...`);
+            
+            const unitsWithWeapons = units.map(unit => {
+                const weapons = this.getWeaponsForUnit(unit);
+                
+                return {
+                    unit: {
+                        id: unit.$.id,
+                        name: unit.$.name,
+                        type: unit.$.type,
+                        points: this.getUnitPoints(unit)
+                    },
+                    weapons: weapons
+                };
+            });
+            
+            console.log(`✅ ${unitsWithWeapons.length} unités avec armes préparées`);
+            return unitsWithWeapons;
+        } catch (error) {
+            console.error('❌ Erreur dans getUnitsWithWeapons:', error);
+            return [];
+        }
     }
 
     getUnitPoints(unit) {
@@ -239,6 +291,32 @@ getWeaponsForUnit(unit) {
             unit.$ && unit.$.name && 
             unit.$.name.toLowerCase().includes(unitName.toLowerCase())
         );
+    }
+
+    // Méthode pour obtenir toutes les armes
+    getWeapons() {
+        if (!this.data || !this.data.catalogue) return [];
+        
+        try {
+            const catalogue = this.data.catalogue;
+            let weapons = [];
+            
+            if (catalogue.sharedSelectionEntries && catalogue.sharedSelectionEntries[0]) {
+                const entries = catalogue.sharedSelectionEntries[0].selectionEntry || [];
+                entries.forEach(entry => {
+                    if (entry.$ && entry.profiles) {
+                        const weaponProfiles = this.extractWeaponProfiles(entry);
+                        weapons = weapons.concat(weaponProfiles);
+                    }
+                });
+            }
+            
+            console.log(`🔫 ${weapons.length} armes trouvées au total`);
+            return weapons;
+        } catch (error) {
+            console.error('Erreur getWeapons:', error);
+            return [];
+        }
     }
 }
 
